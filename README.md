@@ -1,3 +1,3 @@
 # LoreGoblin-Engine
-# Feed it world,
-# Let it live
+Feed it world,
+Let it live
