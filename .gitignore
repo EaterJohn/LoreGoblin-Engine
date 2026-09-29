@@ -37,6 +37,9 @@ htmlcov/
 data/*.db
 data/*.sqlite
 data/*.sqlite3
+data/worlds/*/*.db
+data/worlds/*/*.sqlite
+data/worlds/*/*.sqlite3
 
 # =========================
 # Logs
