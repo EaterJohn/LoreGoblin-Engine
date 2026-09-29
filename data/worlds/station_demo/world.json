@@ -24,7 +24,8 @@
           "precise",
           "reserved"
         ],
-        "role": "quartermaster"
+        "role": "quartermaster",
+        "allow_to": ["trade"]
       }
     },
     {
