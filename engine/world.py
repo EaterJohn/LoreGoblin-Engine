@@ -1,5 +1,9 @@
 import json
+import re
 from pathlib import Path
+
+# id пресета — это имя файла, а не путь: только безопасные символы.
+PRESET_ID_RE = re.compile(r'^[A-Za-z0-9_-]+$')
 
 
 class WorldEngine:
@@ -37,15 +41,21 @@ class WorldEngine:
                 raise ValueError(f'Rules preset time.{field} must be a positive integer: {path}')
 
     def load_world(self, path):
-        """Load a world definition from JSON into an empty database.
+        """Load a world definition from JSON.
+
+        Возвращает True, если состояние мира создано в пустой БД, и False,
+        если БД уже содержит мир (существующее состояние не перезаписывается).
+
+        Файл читается и валидируется всегда, а `rules_preset` применяется при
+        каждой загрузке, в том числе для уже существующей БД: правила механик
+        это конфигурация, а не сохранённое состояние (DECISIONS #ENG-021).
+        Создание состояния идёт одной транзакцией: при любой ошибке в БД не
+        остаётся ни world_state, ни части сущностей.
 
         The JSON file contains only world data: initial time/location, player
         data, entities, and starting money. The engine mechanics stay here;
         world-specific lore does not.
         """
-        if self.db.query('SELECT id FROM world_state WHERE id=1'):
-            return
-
         path = Path(path)
         if not path.is_file():
             raise FileNotFoundError(f'World definition not found: {path}')
@@ -55,65 +65,81 @@ class WorldEngine:
 
         self._validate_world_definition(world, path)
 
-        if world.get('rules_preset'):
-            preset_path = path.parents[2] / 'rules' / 'presets' / f"{world['rules_preset']}.json"
-            preset_path = preset_path.resolve()
-            self.load_rules(preset_path)
+        if world.get('rules_preset') is not None:
+            self.load_rules(self._preset_path(world['rules_preset'], path))
+
+        if self.db.query('SELECT id FROM world_state WHERE id=1'):
+            return False
 
         world_time = world['world_time']
         start_location_id = world['start_location_id']
         player = world['player']
 
-        self.db.execute(
-            'INSERT INTO world_state(id, world_time, location_id) VALUES(1, ?, ?)',
-            (world_time, start_location_id),
-        )
+        with self.db.transaction():
+            self.db.execute(
+                'INSERT INTO world_state(id, world_time, location_id) VALUES(1, ?, ?)',
+                (world_time, start_location_id),
+            )
 
-        player_data = {
-            'stats': player['stats'],
-        }
-        self.db.execute(
-            'INSERT INTO entities(id,type,name,location_id,data_json) VALUES(?,?,?,?,?)',
-            (
-                player['id'],
-                'player',
-                player['name'],
-                player['location_id'],
-                json.dumps(player_data, ensure_ascii=False),
-            ),
-        )
-
-        for entity in world['entities']:
+            player_data = {
+                'stats': player['stats'],
+            }
             self.db.execute(
                 'INSERT INTO entities(id,type,name,location_id,data_json) VALUES(?,?,?,?,?)',
                 (
-                    entity['id'],
-                    entity['type'],
-                    entity['name'],
-                    entity.get('location_id'),
-                    json.dumps(entity.get('data', {}), ensure_ascii=False),
+                    player['id'],
+                    'player',
+                    player['name'],
+                    player['location_id'],
+                    json.dumps(player_data, ensure_ascii=False),
                 ),
             )
 
-        self.db.execute(
-            'INSERT INTO money(owner_id,silver) VALUES(?,?)',
-            (player['id'], player['starting_money']),
-        )
-        self.db.execute(
-            'INSERT INTO events(world_time,event_type,actor_id,data_json) VALUES(?,?,?,?)',
-            (
-                world_time,
-                'world_created',
-                player['id'],
-                json.dumps(
-                    {'world_definition': str(path.as_posix())},
-                    ensure_ascii=False,
+            for entity in world['entities']:
+                self.db.execute(
+                    'INSERT INTO entities(id,type,name,location_id,data_json) VALUES(?,?,?,?,?)',
+                    (
+                        entity['id'],
+                        entity['type'],
+                        entity['name'],
+                        entity.get('location_id'),
+                        json.dumps(entity.get('data', {}), ensure_ascii=False),
+                    ),
+                )
+
+            self.db.execute(
+                'INSERT INTO money(owner_id,silver) VALUES(?,?)',
+                (player['id'], player['starting_money']),
+            )
+            self.db.execute(
+                'INSERT INTO events(world_time,event_type,actor_id,data_json) VALUES(?,?,?,?)',
+                (
+                    world_time,
+                    'world_created',
+                    player['id'],
+                    json.dumps(
+                        {'world_definition': str(path.as_posix())},
+                        ensure_ascii=False,
+                    ),
                 ),
-            ),
-        )
+            )
+        return True
+
+    @staticmethod
+    def _preset_path(preset_id, world_path):
+        """Путь к пресету: <data>/rules/presets/<id>.json рядом с <data>/worlds/<w>/world.json."""
+        parents = Path(world_path).resolve().parents
+        if len(parents) < 3:
+            raise FileNotFoundError(
+                f'Cannot locate rules presets directory for world: {world_path}'
+            )
+        return parents[2] / 'rules' / 'presets' / f'{preset_id}.json'
 
     @staticmethod
     def _validate_world_definition(world, path):
+        def non_empty_str(value):
+            return isinstance(value, str) and bool(value.strip())
+
         if not isinstance(world, dict):
             raise ValueError(f'World definition must be an object: {path}')
 
@@ -124,12 +150,25 @@ class WorldEngine:
                 f'World definition missing required fields {sorted(missing)}: {path}'
             )
 
+        preset_id = world.get('rules_preset')
+        if preset_id is not None and not (
+            isinstance(preset_id, str) and PRESET_ID_RE.fullmatch(preset_id)
+        ):
+            raise ValueError(
+                f'World rules_preset must be a simple id (letters, digits, _ or -): {path}'
+            )
+
         player = world['player']
         if not isinstance(player, dict):
             raise ValueError('World player must be an object')
         for field in ('id', 'name', 'location_id', 'stats', 'starting_money'):
             if field not in player:
                 raise ValueError(f'World player missing required field: {field}')
+        for field in ('id', 'name', 'location_id'):
+            if not non_empty_str(player[field]):
+                raise ValueError(f'World player {field} must be a non-empty string')
+        if not isinstance(player['stats'], dict):
+            raise ValueError('World player stats must be an object')
 
         if not isinstance(world['entities'], list):
             raise ValueError('World entities must be a list')
@@ -141,6 +180,10 @@ class WorldEngine:
             for field in ('id', 'type', 'name'):
                 if field not in entity:
                     raise ValueError(f'World entity missing required field: {field}')
+                if not non_empty_str(entity[field]):
+                    raise ValueError(f'World entity {field} must be a non-empty string')
+            if not isinstance(entity.get('data', {}), dict):
+                raise ValueError(f"World entity {entity['id']!r} data must be an object")
             ids.append(entity['id'])
 
         if len(ids) != len(set(ids)):
@@ -151,7 +194,8 @@ class WorldEngine:
                 'World start_location_id must match the player location_id'
             )
 
-        if not isinstance(player['starting_money'], int) or player['starting_money'] < 0:
+        money = player['starting_money']
+        if isinstance(money, bool) or not isinstance(money, int) or money < 0:
             raise ValueError('World player starting_money must be a non-negative integer')
 
     def world_state(self):
@@ -258,30 +302,31 @@ class WorldEngine:
         )
         if not money or money[0]['silver'] < price:
             return {'ok': False, 'error': 'INSUFFICIENT_FUNDS'}
-        self.db.execute(
-            'UPDATE money SET silver=silver-? WHERE owner_id=?',
-            (price, buyer_id),
-        )
-        self.db.execute(
-            '''INSERT INTO inventory(owner_id,item_id,quantity) VALUES(?,?,1)
-               ON CONFLICT(owner_id,item_id) DO UPDATE SET quantity=quantity+1''',
-            (buyer_id, item_id),
-        )
-        self.db.execute(
-            'UPDATE entities SET location_id=NULL WHERE id=?',
-            (item_id,),
-        )
-        self.db.execute(
-            '''INSERT INTO events(world_time,event_type,actor_id,target_id,data_json)
-               VALUES(?,?,?,?,?)''',
-            (
-                self.world_state()['world_time'],
-                'purchase',
-                buyer_id,
-                item_id,
-                json.dumps({'price': price}, ensure_ascii=False),
-            ),
-        )
+        with self.db.transaction():
+            self.db.execute(
+                'UPDATE money SET silver=silver-? WHERE owner_id=?',
+                (price, buyer_id),
+            )
+            self.db.execute(
+                '''INSERT INTO inventory(owner_id,item_id,quantity) VALUES(?,?,1)
+                   ON CONFLICT(owner_id,item_id) DO UPDATE SET quantity=quantity+1''',
+                (buyer_id, item_id),
+            )
+            self.db.execute(
+                'UPDATE entities SET location_id=NULL WHERE id=?',
+                (item_id,),
+            )
+            self.db.execute(
+                '''INSERT INTO events(world_time,event_type,actor_id,target_id,data_json)
+                   VALUES(?,?,?,?,?)''',
+                (
+                    self.world_state()['world_time'],
+                    'purchase',
+                    buyer_id,
+                    item_id,
+                    json.dumps({'price': price}, ensure_ascii=False),
+                ),
+            )
         return {
             'ok': True,
             'item': item['name'],
@@ -337,25 +382,26 @@ class WorldEngine:
         money = self.inventory(player_id)['money']
         if money < cost:
             return {'ok': False, 'error': 'INSUFFICIENT_FUNDS', 'cost': cost, 'silver': money}
-        stats[stat] += 1
-        ent['data']['stats'] = stats
-        self.db.execute(
-            'UPDATE entities SET data_json=? WHERE id=?',
-            (json.dumps(ent['data'], ensure_ascii=False), player_id),
-        )
-        self.db.execute(
-            'UPDATE money SET silver=silver-? WHERE owner_id=?',
-            (cost, player_id),
-        )
-        self.db.execute(
-            'INSERT INTO events(world_time,event_type,actor_id,data_json) VALUES(?,?,?,?)',
-            (
-                self.world_state()['world_time'],
-                'stat_upgrade',
-                player_id,
-                json.dumps({'stat': stat, 'cost': cost}, ensure_ascii=False),
-            ),
-        )
+        with self.db.transaction():
+            stats[stat] += 1
+            ent['data']['stats'] = stats
+            self.db.execute(
+                'UPDATE entities SET data_json=? WHERE id=?',
+                (json.dumps(ent['data'], ensure_ascii=False), player_id),
+            )
+            self.db.execute(
+                'UPDATE money SET silver=silver-? WHERE owner_id=?',
+                (cost, player_id),
+            )
+            self.db.execute(
+                'INSERT INTO events(world_time,event_type,actor_id,data_json) VALUES(?,?,?,?)',
+                (
+                    self.world_state()['world_time'],
+                    'stat_upgrade',
+                    player_id,
+                    json.dumps({'stat': stat, 'cost': cost}, ensure_ascii=False),
+                ),
+            )
         return {
             'ok': True,
             'stat': stat,
@@ -365,7 +411,7 @@ class WorldEngine:
         }
 
     def advance_time(self, minutes):
-        if not isinstance(minutes, int) or minutes < 0:
+        if isinstance(minutes, bool) or not isinstance(minutes, int) or minutes < 0:
             return {'ok': False, 'error': 'INVALID_TIME_DELTA'}
         state = self.world_state()
         parts = state['world_time'].split(' ', 2)
@@ -383,16 +429,17 @@ class WorldEngine:
         day += total // (minutes_per_hour * hours_per_day)
         total %= minutes_per_hour * hours_per_day
         new = f'Day {day} {total // minutes_per_hour:02d}:{total % minutes_per_hour:02d}'
-        self.db.execute(
-            'UPDATE world_state SET world_time=? WHERE id=1',
-            (new,),
-        )
-        self.db.execute(
-            'INSERT INTO events(world_time,event_type,data_json) VALUES(?,?,?)',
-            (
-                new,
-                'time_advanced',
-                json.dumps({'minutes': minutes}),
-            ),
-        )
+        with self.db.transaction():
+            self.db.execute(
+                'UPDATE world_state SET world_time=? WHERE id=1',
+                (new,),
+            )
+            self.db.execute(
+                'INSERT INTO events(world_time,event_type,data_json) VALUES(?,?,?)',
+                (
+                    new,
+                    'time_advanced',
+                    json.dumps({'minutes': minutes}),
+                ),
+            )
         return {'ok': True, 'world_time': new}
