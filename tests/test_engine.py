@@ -124,6 +124,25 @@ def test_load_world_is_world_agnostic():
         cleanup(p, w)
 
 
+def test_advance_time_same_day():
+    p, w = make_world('station_demo')
+    try:
+        r = w.advance_time(30)
+        assert r['ok']
+        assert r['world_time'] == 'Day 1 08:30'
+    finally:
+        cleanup(p, w)
+
+
+def test_advance_time_crosses_midnight():
+    p, w = make_world('station_demo')
+    try:
+        w.advance_time(16 * 60 + 30)
+        assert w.world_state()['world_time'] == 'Day 2 00:30'
+    finally:
+        cleanup(p, w)
+
+
 def test_load_world_does_not_overwrite_existing_state():
     p, w = make_world('station_demo')
     try:
