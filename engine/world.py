@@ -194,6 +194,33 @@ class WorldEngine:
             out.append(d)
         return out
 
+    def allow_to(self, entity_id, action):
+        """Return whether an entity is canonically allowed to perform an action."""
+        entity = self.get_entity(entity_id)
+        if not entity:
+            return False
+        allowed = entity['data'].get('allow_to', [])
+        return isinstance(allowed, list) and action in allowed
+
+    def find_allowed_entities(self, action, location_id, entity_type='npc'):
+        """Find entities at a location that are allowed to perform action."""
+        rows = self.db.query(
+            'SELECT id,type,name,data_json FROM entities WHERE type=? AND location_id=? ORDER BY name',
+            (entity_type, location_id),
+        )
+        out = []
+        for r in rows:
+            data = json.loads(r['data_json'])
+            allowed = data.get('allow_to', [])
+            if isinstance(allowed, list) and action in allowed:
+                out.append({
+                    'id': r['id'],
+                    'type': r['type'],
+                    'name': r['name'],
+                    'data': data,
+                })
+        return out
+
     def get_location_contents(self, location_id):
         rows = self.db.query(
             'SELECT id,type,name FROM entities WHERE location_id=? ORDER BY type,name',
@@ -223,6 +250,13 @@ class WorldEngine:
         seller = self.get_entity(seller_id)
         if not seller:
             return {'ok': False, 'error': 'SELLER_NOT_FOUND'}
+        if not self.allow_to(seller_id, 'trade'):
+            return {'ok': False, 'error': 'SELLER_NOT_AVAILABLE_FOR_TRADE'}
+        buyer = self.get_entity(buyer_id)
+        if not buyer:
+            return {'ok': False, 'error': 'BUYER_NOT_FOUND'}
+        if buyer['location_id'] != seller['location_id']:
+            return {'ok': False, 'error': 'BUYER_AND_SELLER_NOT_TOGETHER'}
         price = item['data'].get('price')
         if price is None:
             return {'ok': False, 'error': 'PRICE_UNKNOWN'}
@@ -271,6 +305,8 @@ class WorldEngine:
         seller = self.get_entity(seller_id)
         if not seller:
             return {'ok': False, 'error': 'SELLER_NOT_FOUND'}
+        if not self.allow_to(seller_id, 'trade'):
+            return {'ok': False, 'error': 'SELLER_NOT_AVAILABLE_FOR_TRADE'}
         rows = self.db.query(
             "SELECT id,name,data_json FROM entities WHERE type='item' AND location_id=?",
             (seller['location_id'],),
@@ -290,10 +326,7 @@ class WorldEngine:
         """Return whether a location has an NPC and at least one priced item."""
         if not location_id:
             return False
-        npcs = self.db.query(
-            "SELECT id FROM entities WHERE type='npc' AND location_id=?",
-            (location_id,),
-        )
+        npcs = self.find_allowed_entities('trade', location_id)
         if not npcs:
             return False
         items = self.db.query(
