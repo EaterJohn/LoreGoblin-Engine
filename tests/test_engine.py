@@ -143,6 +143,30 @@ def test_advance_time_crosses_midnight():
         cleanup(p, w)
 
 
+def test_missing_tool_argument_returns_structured_error():
+    p, w = make()
+    try:
+        from engine.actions import ActionAPI
+        api = ActionAPI(w)
+        assert api.call('get_seller_stock', {}) == {
+            'ok': False,
+            'error': 'SELLER_ID_REQUIRED',
+        }
+    finally:
+        cleanup(p, w)
+
+
+def test_advance_time_uses_rules_preset():
+    p, w = make_world('station_demo')
+    try:
+        w.rules['time']['hours_per_day'] = 30
+        r = w.advance_time(22 * 60 + 30)
+        assert r['ok']
+        assert r['world_time'] == 'Day 2 06:30'
+    finally:
+        cleanup(p, w)
+
+
 def test_load_world_does_not_overwrite_existing_state():
     p, w = make_world('station_demo')
     try:
@@ -161,6 +185,8 @@ if __name__ == '__main__':
     test_seller_stock_matches_buy_item()
     test_seller_stock_unknown_seller()
     test_tools_filtered_by_location()
+    test_missing_tool_argument_returns_structured_error()
+    test_advance_time_uses_rules_preset()
     test_load_world_is_world_agnostic()
     test_load_world_does_not_overwrite_existing_state()
     print('ALL TESTS PASS')
