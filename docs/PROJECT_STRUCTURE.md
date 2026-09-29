@@ -8,6 +8,7 @@
 ```text
 LoreGoblin-Engine/
 ├── main.py                  # CLI, world selection, system prompt, messages, tool-loop
+├── pyproject.toml           # метаданные, dev-зависимость pytest, настройки pytest
 ├── README.md
 ├── docs/
 │   ├── AI_CONTEXT.md
@@ -38,7 +39,12 @@ LoreGoblin-Engine/
 │   ├── __init__.py
 │   └── ollama.py
 └── tests/
-    └── test_engine.py
+    ├── conftest.py          # фикстуры: world/station, make_pack, fail_on
+    ├── test_engine.py       # механики на bundled-мирах (allizium, station_demo)
+    ├── test_loader.py       # load_world: пресеты, валидация, откат при сбое
+    ├── test_transactions.py # атомарность Database и мутаций Engine
+    ├── test_actions.py      # ActionAPI: аргументы от LLM, ошибки
+    └── test_main.py         # tool-loop с FakeLLM, resolve_world
 ```
 
 ## Что где искать
@@ -54,6 +60,7 @@ LoreGoblin-Engine/
 | Понять загрузку стартового состояния | `engine/world.py::load_world()` |
 | Изменить параметры календаря | `data/rules/presets/<id>.json` |
 | Проверить архитектурные решения | `docs/DECISIONS.md` |
+| Запустить тесты | `pip install -e ".[dev]"` и `pytest` |
 
 ## Известные открытые задачи
 

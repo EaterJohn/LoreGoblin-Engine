@@ -75,6 +75,15 @@ def load_world_prompt(world_dir):
     return prompt_file.read_text(encoding='utf-8').strip()
 
 
+def read_command():
+    """Читает строку из REPL; None при Ctrl-C / конце stdin (штатный выход)."""
+    try:
+        return input('\n> ').strip()
+    except (EOFError, KeyboardInterrupt):
+        print()
+        return None
+
+
 def run_tool_loop(llm, api, world, messages):
     """Гоняет LLM и Engine по кругу, пока модель продолжает запрашивать
     инструменты, вместо одного повторного вызова."""
@@ -132,8 +141,8 @@ def main():
     print('Команды: /state /inventory /tools /reset (удалить текущий world.db) /quit')
 
     while True:
-        user = input('\n> ').strip()
-        if user == '/quit':
+        user = read_command()
+        if user is None or user == '/quit':
             break
         if user == '/state':
             print(json.dumps(world.world_state(), ensure_ascii=False, indent=2))
@@ -150,6 +159,8 @@ def main():
         messages.append({'role': 'user', 'content': user})
         reply = run_tool_loop(llm, api, world, messages)
         print('\n' + reply)
+
+    db.close()
 
 
 if __name__ == '__main__':

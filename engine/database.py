@@ -1,4 +1,5 @@
 import sqlite3
+from contextlib import contextmanager
 from pathlib import Path
 
 SCHEMA = '''
@@ -42,11 +43,50 @@ class Database:
         self.conn.row_factory = sqlite3.Row
         self.conn.executescript(SCHEMA)
         self.conn.commit()
+        self._tx_depth = 0
 
     def execute(self, sql, params=()):
-        cur = self.conn.execute(sql, params)
-        self.conn.commit()
+        """Выполнить один запрос.
+
+        Вне `transaction()` коммитит сразу (одиночная запись атомарна сама по
+        себе). Внутри `transaction()` коммит откладывается до выхода из блока.
+        """
+        try:
+            cur = self.conn.execute(sql, params)
+        except BaseException:
+            if not self._tx_depth:
+                self.conn.rollback()
+            raise
+        if not self._tx_depth:
+            self.conn.commit()
         return cur
+
+    @contextmanager
+    def transaction(self):
+        """Группа изменений «всё или ничего».
+
+        Любое исключение внутри блока откатывает все запросы блока. Вложенный
+        вызов присоединяется к внешней транзакции и сам ничего не коммитит и
+        не откатывает: решает внешний блок. Любая мутация, затрагивающая
+        больше одной записи, обязана выполняться внутри `transaction()`.
+        """
+        if self._tx_depth:
+            self._tx_depth += 1
+            try:
+                yield
+            finally:
+                self._tx_depth -= 1
+            return
+        self._tx_depth = 1
+        try:
+            yield
+        except BaseException:
+            self.conn.rollback()
+            raise
+        else:
+            self.conn.commit()
+        finally:
+            self._tx_depth = 0
 
     def query(self, sql, params=()):
         return self.conn.execute(sql, params).fetchall()

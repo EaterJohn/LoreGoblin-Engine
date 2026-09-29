@@ -6,7 +6,7 @@ Local-first engine for persistent LLM-driven worlds.
 
 ## Requirements
 
-- Python 3.14+
+- Python 3.12+ (проект разрабатывается на 3.14)
 - Ollama
 - Gemma 4 e4b
 
@@ -28,5 +28,6 @@ SQLite runtime state хранится рядом как `world.db` и не ко�
 ## Tests
 
 ```powershell
-python tests/test_engine.py
+pip install -e ".[dev]"
+pytest
 ```
