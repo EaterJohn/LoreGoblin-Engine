@@ -87,18 +87,52 @@ def test_seller_stock_unknown_seller():
         cleanup(p, w)
 
 
+def test_allow_to_is_reusable_capability():
+    p, w = make()
+    try:
+        assert w.allow_to('boris', 'trade')
+        assert not w.allow_to('boris', 'repair')
+        assert w.find_allowed_entities('trade', 'tavern_red_flask')[0]['id'] == 'boris'
+    finally:
+        cleanup(p, w)
+
+
+def test_contextual_trade_tools():
+    p, w = make()
+    try:
+        from engine.actions import ActionAPI
+        api = ActionAPI(w)
+        world_names = {t['function']['name'] for t in api.tools('tavern_red_flask')}
+        assert 'start_trade' in world_names
+        assert 'buy_item' not in world_names
+        result = api.call('start_trade', {})
+        assert result['ok']
+        assert result['interaction'] == 'trade'
+        trade_names = {t['function']['name'] for t in api.tools('tavern_red_flask')}
+        assert trade_names == {'get', 'buy', 'end'}
+        stock = api.call('get', {})
+        assert stock['ok']
+        assert [i['name'] for i in stock['items']] == ['Кружка пива', 'Железный кинжал']
+        bought = api.call('buy', {'choice': 2})
+        assert bought['ok']
+        assert w.inventory()['items'][0]['item_id'] == 'iron_dagger'
+        ended = api.call('end', {})
+        assert ended['ok']
+    finally:
+        cleanup(p, w)
+
+
 def test_tools_filtered_by_location():
     p, w = make()
     try:
         from engine.actions import ActionAPI
         api = ActionAPI(w)
         names_at_tavern = {t['function']['name'] for t in api.tools('tavern_red_flask')}
-        assert {'get_seller_stock', 'buy_item'} <= names_at_tavern
+        assert 'start_trade' in names_at_tavern
         names_empty_location = {t['function']['name'] for t in api.tools('ashport')}
-        assert 'buy_item' not in names_empty_location
-        assert 'get_seller_stock' not in names_empty_location
+        assert 'start_trade' not in names_empty_location
         names_default = {t['function']['name'] for t in api.tools()}
-        assert 'buy_item' in names_default
+        assert 'start_trade' in names_default
     finally:
         cleanup(p, w)
 
@@ -143,19 +177,6 @@ def test_advance_time_crosses_midnight():
         cleanup(p, w)
 
 
-def test_missing_tool_argument_returns_structured_error():
-    p, w = make()
-    try:
-        from engine.actions import ActionAPI
-        api = ActionAPI(w)
-        assert api.call('get_seller_stock', {}) == {
-            'ok': False,
-            'error': 'SELLER_ID_REQUIRED',
-        }
-    finally:
-        cleanup(p, w)
-
-
 def test_advance_time_uses_rules_preset():
     p, w = make_world('station_demo')
     try:
@@ -184,8 +205,9 @@ if __name__ == '__main__':
     test_stat_upgrade()
     test_seller_stock_matches_buy_item()
     test_seller_stock_unknown_seller()
+    test_allow_to_is_reusable_capability()
+    test_contextual_trade_tools()
     test_tools_filtered_by_location()
-    test_missing_tool_argument_returns_structured_error()
     test_advance_time_uses_rules_preset()
     test_load_world_is_world_agnostic()
     test_load_world_does_not_overwrite_existing_state()
