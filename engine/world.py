@@ -56,7 +56,7 @@ class WorldEngine:
         self._validate_world_definition(world, path)
 
         if world.get('rules_preset'):
-            preset_path = path.parents[2] / '..' / 'rules' / 'presets' / f"{world['rules_preset']}.json"
+            preset_path = path.parents[2] / 'rules' / 'presets' / f"{world['rules_preset']}.json"
             preset_path = preset_path.resolve()
             self.load_rules(preset_path)
 
