@@ -7,6 +7,7 @@ class ActionAPI:
         self.session = {
             'mode': 'world',
             'trade_seller_id': None,
+            'trade_choices': {},
         }
 
     def tools(self, location_id=None):
@@ -80,27 +81,52 @@ class ActionAPI:
                 seller_id = self.session['trade_seller_id']
                 if seller_id is None:
                     return {'ok': False, 'error': 'NO_ACTIVE_TRADE'}
-                return self.world.get_seller_stock(seller_id)
+                stock = self.world.get_seller_stock(seller_id)
+                if stock.get('ok'):
+                    self.session['trade_choices'] = {
+                        i: item['item_id']
+                        for i, item in enumerate(stock['items'], 1)
+                    }
+                return stock
 
             if name == 'buy':
                 if 'choice' not in args:
                     return {'ok': False, 'error': 'ITEM_CHOICE_REQUIRED'}
+                choice = args['choice']
+                if not isinstance(choice, int) or choice < 1:
+                    return {'ok': False, 'error': 'INVALID_ITEM_CHOICE'}
+                if choice not in self.session['trade_choices']:
+                    return {
+                        'ok': False,
+                        'error': 'STOCK_NOT_LOADED',
+                        'message': 'Call get first and use a choice from its latest result.',
+                    }
+
                 seller_id = self.session['trade_seller_id']
                 stock = self.world.get_seller_stock(seller_id)
                 if not stock.get('ok'):
                     return stock
-                choice = args['choice']
-                if not isinstance(choice, int) or choice < 1 or choice > len(stock['items']):
+
+                item_id = self.session['trade_choices'][choice]
+                item = next(
+                    (item for item in stock['items'] if item['item_id'] == item_id),
+                    None,
+                )
+                if item is None:
+                    self.session['trade_choices'] = {
+                        i: current['item_id']
+                        for i, current in enumerate(stock['items'], 1)
+                    }
                     return {
                         'ok': False,
-                        'error': 'INVALID_ITEM_CHOICE',
+                        'error': 'ITEM_NO_LONGER_AVAILABLE',
                         'available_items': [
-                            {'choice': i, 'name': item['name']}
-                            for i, item in enumerate(stock['items'], 1)
+                            {'choice': i, 'name': current['name']}
+                            for i, current in enumerate(stock['items'], 1)
                         ],
                     }
-                item = stock['items'][choice - 1]
-                result = self.world.buy_item('player', item['item_id'], seller_id)
+
+                result = self.world.buy_item('player', item_id, seller_id)
                 if result.get('ok'):
                     result['choice'] = choice
                 return result
@@ -108,6 +134,7 @@ class ActionAPI:
             if name == 'end':
                 self.session['mode'] = 'world'
                 self.session['trade_seller_id'] = None
+                self.session['trade_choices'] = {}
                 return {'ok': True, 'interaction': 'trade', 'status': 'ended'}
 
             return {'ok': False, 'error': 'TOOL_NOT_AVAILABLE_IN_TRADE'}
@@ -152,6 +179,7 @@ class ActionAPI:
 
             self.session['mode'] = 'trade'
             self.session['trade_seller_id'] = seller_id
+            self.session['trade_choices'] = {}
             seller = self.world.get_entity(seller_id)
             return {
                 'ok': True,
