@@ -29,7 +29,8 @@
           "cautious",
           "practical"
         ],
-        "role": "innkeeper"
+        "role": "innkeeper",
+        "allow_to": ["trade"]
       }
     },
     {
