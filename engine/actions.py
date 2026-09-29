@@ -1,4 +1,33 @@
+import logging
+import re
+
 from .world import WorldEngine
+
+log = logging.getLogger(__name__)
+
+_INT_RE = re.compile(r'[+-]?\d+')
+
+
+def _as_int(value):
+    """Целое из аргумента tool call или None.
+
+    Слабые модели часто шлют число строкой ("30") или как 30.0, это принимаем.
+    bool не считается числом (True не должно превращаться в 1).
+    """
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else None
+    if isinstance(value, str) and _INT_RE.fullmatch(value.strip()):
+        return int(value.strip())
+    return None
+
+
+def _text(value):
+    """Непустая строка из аргумента tool call или None."""
+    return value if isinstance(value, str) and value.strip() else None
 
 
 class ActionAPI:
@@ -76,6 +105,25 @@ class ActionAPI:
         return core
 
     def call(self, name, args):
+        """Единственная точка входа для tool calls от LLM.
+
+        Контракт: не бросает исключений. Некорректные аргументы и любой сбой
+        внутри Engine возвращаются как `{'ok': False, 'error': ...}`, чтобы
+        ошибка модели или движка не роняла REPL. Изменения состояния
+        атомарны (см. `Database.transaction`), поэтому после сбоя мир
+        остаётся согласованным.
+        """
+        if args is None:
+            args = {}
+        if not isinstance(args, dict):
+            return {'ok': False, 'error': 'INVALID_ARGUMENTS'}
+        try:
+            return self._dispatch(name, args)
+        except Exception:
+            log.exception('Tool %r failed with arguments %r', name, args)
+            return {'ok': False, 'error': 'INTERNAL_ERROR'}
+
+    def _dispatch(self, name, args):
         if self.session['mode'] == 'trade':
             if name == 'get':
                 seller_id = self.session['trade_seller_id']
@@ -92,8 +140,8 @@ class ActionAPI:
             if name == 'buy':
                 if 'choice' not in args:
                     return {'ok': False, 'error': 'ITEM_CHOICE_REQUIRED'}
-                choice = args['choice']
-                if not isinstance(choice, int) or choice < 1:
+                choice = _as_int(args['choice'])
+                if choice is None or choice < 1:
                     return {'ok': False, 'error': 'INVALID_ITEM_CHOICE'}
                 if choice not in self.session['trade_choices']:
                     return {
@@ -141,8 +189,10 @@ class ActionAPI:
 
         if name == 'start_trade':
             choice = args.get('choice')
-            if choice is not None and not isinstance(choice, int):
-                return {'ok': False, 'error': 'INVALID_TRADER_CHOICE'}
+            if choice is not None:
+                choice = _as_int(choice)
+                if choice is None:
+                    return {'ok': False, 'error': 'INVALID_TRADER_CHOICE'}
 
             location_id = self.world.world_state()['location_id']
             traders = self.world.find_allowed_entities('trade', location_id)
@@ -191,27 +241,44 @@ class ActionAPI:
         if name == 'get_world_state':
             return self.world.world_state()
         if name == 'get_location_contents':
-            if 'location_id' not in args:
+            location_id = _text(args.get('location_id'))
+            if location_id is None:
                 return {'ok': False, 'error': 'LOCATION_ID_REQUIRED'}
-            return self.world.get_location_contents(args['location_id'])
+            return self.world.get_location_contents(location_id)
         if name == 'get_entity':
-            if 'entity_id' not in args:
+            entity_id = _text(args.get('entity_id'))
+            if entity_id is None:
                 return {'ok': False, 'error': 'ENTITY_ID_REQUIRED'}
-            return self.world.get_entity(args['entity_id'])
+            entity = self.world.get_entity(entity_id)
+            if entity is None:
+                return {'ok': False, 'error': 'ENTITY_NOT_FOUND'}
+            return entity
         if name == 'search_entities':
-            if 'query' not in args:
+            query = _text(args.get('query'))
+            if query is None:
                 return {'ok': False, 'error': 'QUERY_REQUIRED'}
-            return self.world.search_entities(
-                args['query'], args.get('type'), args.get('location_id')
-            )
+            type_, location_id = args.get('type'), args.get('location_id')
+            for optional in (type_, location_id):
+                if optional is not None and not isinstance(optional, str):
+                    return {'ok': False, 'error': 'INVALID_ARGUMENTS'}
+            return self.world.search_entities(query, type_, location_id)
         if name == 'get_inventory':
-            return self.world.inventory(args.get('owner_id', 'player'))
+            owner_id = args.get('owner_id')
+            if owner_id is None:
+                owner_id = 'player'
+            elif _text(owner_id) is None:
+                return {'ok': False, 'error': 'INVALID_OWNER_ID'}
+            return self.world.inventory(owner_id)
         if name == 'upgrade_stat':
-            if 'player_id' not in args or 'stat' not in args:
+            player_id, stat = _text(args.get('player_id')), _text(args.get('stat'))
+            if player_id is None or stat is None:
                 return {'ok': False, 'error': 'PLAYER_ID_AND_STAT_REQUIRED'}
-            return self.world.upgrade_stat(args['player_id'], args['stat'])
+            return self.world.upgrade_stat(player_id, stat)
         if name == 'advance_time':
             if 'minutes' not in args:
                 return {'ok': False, 'error': 'MINUTES_REQUIRED'}
-            return self.world.advance_time(int(args['minutes']))
+            minutes = _as_int(args['minutes'])
+            if minutes is None:
+                return {'ok': False, 'error': 'INVALID_TIME_DELTA'}
+            return self.world.advance_time(minutes)
         return {'ok': False, 'error': 'UNKNOWN_TOOL'}
