@@ -76,6 +76,34 @@ class WorldEngine:
         self.db.execute('INSERT INTO events(world_time,event_type,actor_id,target_id,data_json) VALUES(?,?,?,?,?)',(self.world_state()['world_time'],'purchase',buyer_id,item_id,json.dumps({'price':price},ensure_ascii=False)))
         return {'ok':True,'item':item['name'],'price':price,'inventory':self.inventory(buyer_id)}
 
+    def get_seller_stock(self, seller_id):
+        """Каноничный список товаров продавца. Использует то же правило
+        co-location, что и buy_item, так что результат всегда совпадает с
+        тем, что реально можно купить. См. DECISIONS.md #ENG-012 — раньше
+        модель для вопроса "что продаёт X" ошибочно брала get_inventory
+        (таблица купленных вещей), а не то, что реально выставлено на
+        продажу по правилам buy_item."""
+        seller=self.get_entity(seller_id)
+        if not seller: return {'ok':False,'error':'SELLER_NOT_FOUND'}
+        rows=self.db.query("SELECT id,name,data_json FROM entities WHERE type='item' AND location_id=?",(seller['location_id'],))
+        items=[]
+        for r in rows:
+            data=json.loads(r['data_json'])
+            if 'price' in data:
+                items.append({'item_id':r['id'],'name':r['name'],'price':data['price']})
+        return {'ok':True,'seller_id':seller_id,'items':items}
+
+    def location_has_shop(self, location_id):
+        """Есть ли в локации хоть один NPC и хоть один предмет с ценой —
+        используется для контекстной фильтрации тулов в ActionAPI.tools(),
+        чтобы не показывать модели торговые инструменты там, где торговать
+        не с кем. См. DECISIONS.md #ENG-013."""
+        if not location_id: return False
+        npcs=self.db.query("SELECT id FROM entities WHERE type='npc' AND location_id=?",(location_id,))
+        if not npcs: return False
+        items=self.db.query("SELECT data_json FROM entities WHERE type='item' AND location_id=?",(location_id,))
+        return any('price' in json.loads(r['data_json']) for r in items)
+
     def upgrade_stat(self, player_id, stat):
         ent=self.get_entity(player_id)
         if not ent or ent['type']!='player': return {'ok':False,'error':'PLAYER_NOT_FOUND'}
