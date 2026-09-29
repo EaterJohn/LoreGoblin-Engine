@@ -154,17 +154,6 @@ class WorldEngine:
         if not isinstance(player['starting_money'], int) or player['starting_money'] < 0:
             raise ValueError('World player starting_money must be a non-negative integer')
 
-    def seed_demo_world(self):
-        """Compatibility wrapper for the bundled ALLIZIUM world."""
-        world_path = (
-            Path(__file__).resolve().parents[1]
-            / 'data'
-            / 'worlds'
-            / 'allizium'
-            / 'world.json'
-        )
-        self.load_world(world_path)
-
     def world_state(self):
         return dict(self.db.query('SELECT * FROM world_state WHERE id=1')[0])
 
