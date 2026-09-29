@@ -1,11 +1,40 @@
 import json
-from datetime import datetime, timedelta
 from pathlib import Path
 
 
 class WorldEngine:
-    def __init__(self, db):
+    def __init__(self, db, rules=None):
         self.db = db
+        self.rules = rules or {
+            'time': {
+                'minutes_per_hour': 60,
+                'hours_per_day': 24,
+                'days_per_month': 30,
+                'months_per_year': 12,
+            }
+        }
+
+    def load_rules(self, path):
+        path = Path(path)
+        if not path.is_file():
+            raise FileNotFoundError(f'Rules preset not found: {path}')
+        with path.open('r', encoding='utf-8') as f:
+            rules = json.load(f)
+        self._validate_rules(rules, path)
+        self.rules = rules
+        return rules
+
+    @staticmethod
+    def _validate_rules(rules, path):
+        if not isinstance(rules, dict):
+            raise ValueError(f'Rules preset must be an object: {path}')
+        time = rules.get('time')
+        if not isinstance(time, dict):
+            raise ValueError(f'Rules preset missing time object: {path}')
+        for field in ('minutes_per_hour', 'hours_per_day', 'days_per_month', 'months_per_year'):
+            value = time.get(field)
+            if not isinstance(value, int) or value <= 0:
+                raise ValueError(f'Rules preset time.{field} must be a positive integer: {path}')
 
     def load_world(self, path):
         """Load a world definition from JSON into an empty database.
@@ -25,6 +54,11 @@ class WorldEngine:
             world = json.load(f)
 
         self._validate_world_definition(world, path)
+
+        if world.get('rules_preset'):
+            preset_path = path.parents[2] / '..' / 'rules' / 'presets' / f"{world['rules_preset']}.json"
+            preset_path = preset_path.resolve()
+            self.load_rules(preset_path)
 
         world_time = world['world_time']
         start_location_id = world['start_location_id']
@@ -309,15 +343,24 @@ class WorldEngine:
         }
 
     def advance_time(self, minutes):
-        # Demo parser for "Day N HH:MM".
+        if not isinstance(minutes, int) or minutes < 0:
+            return {'ok': False, 'error': 'INVALID_TIME_DELTA'}
         state = self.world_state()
-        prefix, time = state['world_time'].split(' ')
-        day = int(prefix.replace('Day', ''))
-        h, m = map(int, time.split(':'))
-        total = h * 60 + m + minutes
-        day += total // 1440
-        total %= 1440
-        new = f'Day {day} {total // 60:02d}:{total % 60:02d}'
+        parts = state['world_time'].split(' ', 2)
+        if len(parts) != 3 or parts[0] != 'Day':
+            raise ValueError(
+                f"Invalid world_time format: {state['world_time']!r}; "
+                'expected "Day N HH:MM"'
+            )
+        day = int(parts[1])
+        h, m = map(int, parts[2].split(':'))
+        time_rules = self.rules['time']
+        minutes_per_hour = time_rules['minutes_per_hour']
+        hours_per_day = time_rules['hours_per_day']
+        total = h * minutes_per_hour + m + minutes
+        day += total // (minutes_per_hour * hours_per_day)
+        total %= minutes_per_hour * hours_per_day
+        new = f'Day {day} {total // minutes_per_hour:02d}:{total % minutes_per_hour:02d}'
         self.db.execute(
             'UPDATE world_state SET world_time=? WHERE id=1',
             (new,),
