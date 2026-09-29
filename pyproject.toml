@@ -10,6 +10,11 @@ dependencies = []
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 
+# Плоская раскладка: без явного списка setuptools не может выбрать пакеты
+# (в корне лежат ещё data/ и docs/), и `pip install -e .` падает.
+[tool.setuptools]
+packages = ["engine", "llm"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["."]
