@@ -1,0 +1,22 @@
+{
+  "world_time": "Day 1 12:00",
+  "start_location_id": "tavern_red_flask",
+  "player": {
+    "id": "player",
+    "name": "Иван",
+    "location_id": "tavern_red_flask",
+    "stats": {"STR":10,"CON":10,"DEX":10,"PER":10,"WIL":10,"INT":10,"CHA":10,"Luck":10,"Eth":10},
+    "starting_money": 100
+  },
+  "entities": [
+    {"id":"boris","type":"npc","name":"Борис","location_id":"tavern_red_flask","data":{"personality":["cautious","practical"],"role":"innkeeper"}},
+    {"id":"tavern_red_flask","type":"location","name":"Таверна «Красный Факел»","location_id":"ashport","data":{"contents":["table_1","chair_1","chair_2","chair_3","chair_4","iron_dagger","beer_mug"]}},
+    {"id":"iron_dagger","type":"item","name":"Железный кинжал","location_id":"tavern_red_flask","data":{"price":12,"damage":3}},
+    {"id":"beer_mug","type":"item","name":"Кружка пива","location_id":"tavern_red_flask","data":{"price":2}},
+    {"id":"table_1","type":"object","name":"Стол","location_id":"tavern_red_flask","data":{}},
+    {"id":"chair_1","type":"object","name":"Стул","location_id":"tavern_red_flask","data":{}},
+    {"id":"chair_2","type":"object","name":"Стул","location_id":"tavern_red_flask","data":{}},
+    {"id":"chair_3","type":"object","name":"Стул","location_id":"tavern_red_flask","data":{}},
+    {"id":"chair_4","type":"object","name":"Стул","location_id":"tavern_red_flask","data":{}}
+  ]
+}
