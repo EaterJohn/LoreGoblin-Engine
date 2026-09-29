@@ -17,6 +17,9 @@ LoreGoblin-Engine/
 │   ├── MODDING.md
 │   └── DEPENDENCY_GRAPH.md
 ├── data/
+│   ├── rules/
+│   │   └── presets/
+│   │       └── standard.json     # внешний пресет базовой календарной механики
 │   └── worlds/
 │       ├── allizium/
 │       │   ├── world.json          # стартовые данные ALLIZIUM
@@ -49,6 +52,7 @@ LoreGoblin-Engine/
 | Изменить world-specific prompt | `data/worlds/<name>/system_prompt.txt` |
 | Выбрать world при запуске | `python main.py --world <name>` |
 | Понять загрузку стартового состояния | `engine/world.py::load_world()` |
+| Изменить параметры календаря | `data/rules/presets/<id>.json` |
 | Проверить архитектурные решения | `docs/DECISIONS.md` |
 
 ## Известные открытые задачи
