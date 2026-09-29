@@ -112,10 +112,19 @@ def test_contextual_trade_tools():
         assert trade_names == {'get', 'buy', 'end'}
         stock = api.call('get', {})
         assert stock['ok']
-        assert [i['name'] for i in stock['items']] == ['Кружка пива', 'Железный кинжал']
-        bought = api.call('buy', {'choice': 2})
+        assert {i['name'] for i in stock['items']} == {'Кружка пива', 'Железный кинжал'}
+        dagger_choice = next(
+            i for i, item in enumerate(stock['items'], 1)
+            if item['name'] == 'Железный кинжал'
+        )
+        bought = api.call('buy', {'choice': dagger_choice})
         assert bought['ok']
         assert w.inventory()['items'][0]['item_id'] == 'iron_dagger'
+
+        # A repeated buy with the same old choice must not silently buy another item.
+        repeated = api.call('buy', {'choice': dagger_choice})
+        assert not repeated['ok']
+        assert repeated['error'] == 'ITEM_NO_LONGER_AVAILABLE'
         ended = api.call('end', {})
         assert ended['ok']
     finally:
