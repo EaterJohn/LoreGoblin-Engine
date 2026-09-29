@@ -162,7 +162,7 @@ def test_advance_time_uses_rules_preset():
         w.rules['time']['hours_per_day'] = 30
         r = w.advance_time(22 * 60 + 30)
         assert r['ok']
-        assert r['world_time'] == 'Day 2 06:30'
+        assert r['world_time'] == 'Day 2 00:30'
     finally:
         cleanup(p, w)
 
