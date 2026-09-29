@@ -1,0 +1,10 @@
+{
+  "id": "standard",
+  "version": 1,
+  "time": {
+    "minutes_per_hour": 60,
+    "hours_per_day": 24,
+    "days_per_month": 30,
+    "months_per_year": 12
+  }
+}
