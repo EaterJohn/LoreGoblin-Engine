@@ -30,14 +30,25 @@ class ActionAPI:
 
     def call(self,name,args):
         if name=='get_world_state': return self.world.world_state()
-        if name=='get_location_contents': return self.world.get_location_contents(args['location_id'])
-        if name=='get_entity': return self.world.get_entity(args['entity_id'])
-        if name=='search_entities': return self.world.search_entities(args['query'],args.get('type'),args.get('location_id'))
+        if name=='get_location_contents':
+            if 'location_id' not in args: return {'ok':False,'error':'LOCATION_ID_REQUIRED'}
+            return self.world.get_location_contents(args['location_id'])
+        if name=='get_entity':
+            if 'entity_id' not in args: return {'ok':False,'error':'ENTITY_ID_REQUIRED'}
+            return self.world.get_entity(args['entity_id'])
+        if name=='search_entities':
+            if 'query' not in args: return {'ok':False,'error':'QUERY_REQUIRED'}
+            return self.world.search_entities(args['query'],args.get('type'),args.get('location_id'))
         if name=='get_inventory': return self.world.inventory(args.get('owner_id','player'))
-        if name=='get_seller_stock': return self.world.get_seller_stock(args['seller_id'])
+        if name=='get_seller_stock':
+            if 'seller_id' not in args: return {'ok':False,'error':'SELLER_ID_REQUIRED'}
+            return self.world.get_seller_stock(args['seller_id'])
         if name=='buy_item':
             if 'seller_id' not in args: return {'ok':False,'error':'SELLER_ID_REQUIRED'}
             return self.world.buy_item(args['buyer_id'],args['item_id'],args['seller_id'])
-        if name=='upgrade_stat': return self.world.upgrade_stat(args['player_id'],args['stat'])
+        if name=='upgrade_stat':
+            if 'player_id' not in args or 'stat' not in args:
+                return {'ok':False,'error':'PLAYER_ID_AND_STAT_REQUIRED'}
+            return self.world.upgrade_stat(args['player_id'],args['stat'])
         if name=='advance_time': return self.world.advance_time(int(args['minutes']))
         return {'ok':False,'error':'UNKNOWN_TOOL'}
