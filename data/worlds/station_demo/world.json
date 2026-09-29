@@ -5,14 +5,67 @@
     "id": "player",
     "name": "Mara",
     "location_id": "station_hub",
-    "stats": {"TECH":10,"REFLEX":10,"WILL":10,"SCIENCE":10},
+    "stats": {
+      "TECH": 10,
+      "REFLEX": 10,
+      "WILL": 10,
+      "SCIENCE": 10
+    },
     "starting_money": 100
   },
   "entities": [
-    {"id":"quartermaster_lee","type":"npc","name":"Ли","location_id":"station_hub","data":{"personality":["precise","reserved"],"role":"quartermaster"}},
-    {"id":"station_hub","type":"location","name":"Центральный модуль станции «Кеплер-7»","location_id":"kepler_7","data":{"contents":["console_1","med_kit","power_cell"]}},
-    {"id":"power_cell","type":"item","name":"Энергетическая ячейка","location_id":"station_hub","data":{"price":15,"charge":100}},
-    {"id":"med_kit","type":"item","name":"Автоматический медкомплект","location_id":"station_hub","data":{"price":20}},
-    {"id":"console_1","type":"object","name":"Навигационная консоль","location_id":"station_hub","data":{}}
-  ]
+    {
+      "id": "quartermaster_lee",
+      "type": "npc",
+      "name": "Ли",
+      "location_id": "station_hub",
+      "data": {
+        "personality": [
+          "precise",
+          "reserved"
+        ],
+        "role": "quartermaster"
+      }
+    },
+    {
+      "id": "station_hub",
+      "type": "location",
+      "name": "Центральный модуль станции «Кеплер-7»",
+      "location_id": "kepler_7",
+      "data": {
+        "contents": [
+          "console_1",
+          "med_kit",
+          "power_cell"
+        ]
+      }
+    },
+    {
+      "id": "power_cell",
+      "type": "item",
+      "name": "Энергетическая ячейка",
+      "location_id": "station_hub",
+      "data": {
+        "price": 15,
+        "charge": 100
+      }
+    },
+    {
+      "id": "med_kit",
+      "type": "item",
+      "name": "Автоматический медкомплект",
+      "location_id": "station_hub",
+      "data": {
+        "price": 20
+      }
+    },
+    {
+      "id": "console_1",
+      "type": "object",
+      "name": "Навигационная консоль",
+      "location_id": "station_hub",
+      "data": {}
+    }
+  ],
+  "rules_preset": "standard"
 }
