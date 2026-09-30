@@ -261,7 +261,17 @@ class WorldEngine:
         )
         return [dict(r) for r in rows]
 
-    def inventory(self, owner_id='player'):
+    def player_id(self):
+        """Id сущности игрока: берётся из мира, а не из константы."""
+        rows = self.db.query("SELECT id FROM entities WHERE type='player' LIMIT 1")
+        if not rows:
+            raise LookupError('World has no player entity')
+        return rows[0]['id']
+
+    def inventory(self, owner_id=None):
+        """Вещи и деньги владельца; без аргумента — игрока."""
+        if owner_id is None:
+            owner_id = self.player_id()
         rows = self.db.query(
             '''SELECT i.item_id,i.quantity,e.name FROM inventory i
                JOIN entities e ON e.id=i.item_id WHERE i.owner_id=?''',
@@ -375,7 +385,7 @@ class WorldEngine:
             return {'ok': False, 'error': 'PLAYER_NOT_FOUND'}
         stats = ent['data'].get('stats', {})
         if stat not in stats:
-            return {'ok': False, 'error': 'UNKNOWN_STAT'}
+            return {'ok': False, 'error': 'UNKNOWN_STAT', 'stats': list(stats)}
         cost = stats[stat] - 9
         if cost < 1:
             cost = 1

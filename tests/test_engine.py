@@ -122,3 +122,32 @@ def test_load_world_does_not_overwrite_existing_state(station):
     station.load_world(WORLD_ROOT / 'allizium' / 'world.json')
     assert station.world_state()['world_time'] == 'Day 1 08:30'
     assert station.get_entity('boris') is None
+
+
+def test_player_id_comes_from_the_world_not_from_a_constant(make_pack, tmp_path):
+    """Движок не должен полагать, что игрок всегда называется 'player'."""
+    from engine.database import Database
+    from engine.world import WorldEngine
+
+    path = make_pack(player={
+        'id': 'hero_7', 'name': 'Hero', 'location_id': 'hub',
+        'stats': {'A': 10}, 'starting_money': 40,
+    })
+    db = Database(str(tmp_path / 'p.db'))
+    try:
+        engine = WorldEngine(db)
+        engine.load_world(path)
+        assert engine.player_id() == 'hero_7'
+        assert engine.inventory() == {'money': 40, 'items': []}
+    finally:
+        db.close()
+
+
+def test_inventory_defaults_to_the_player(world):
+    assert world.inventory() == world.inventory(world.player_id())
+
+
+def test_unknown_stat_error_lists_valid_stats(world):
+    r = world.upgrade_stat('player', 'SPEED')
+    assert r['error'] == 'UNKNOWN_STAT'
+    assert r['stats'] == ['STR', 'CON', 'DEX', 'PER', 'WIL', 'INT', 'CHA', 'Luck', 'Eth']
