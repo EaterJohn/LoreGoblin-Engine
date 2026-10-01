@@ -58,6 +58,7 @@ LoreGoblin-Engine/
     ├── test_loader.py       # load_world: пресеты, валидация, откат при сбое
     ├── test_transactions.py # атомарность Database и мутаций Engine
     ├── test_actions.py      # ActionAPI: аргументы от LLM, ошибки
+    ├── test_interactions.py # политика взаимодействий, сторожевые тесты простоты тулов
     └── test_main.py         # tool-loop с FakeLLM, resolve_world
 ```
 
@@ -65,7 +66,7 @@ LoreGoblin-Engine/
 
 | Нужно... | Смотри в |
 |---|---|
-| Добавить новый tool для LLM | `engine/actions.py` + `engine/world.py` |
+| Добавить новый tool для LLM | `Tool(...)` в `ActionAPI.registry` (`engine/actions.py`); механика в `engine/world.py`; правила имени и аргументов в #ENG-028 |
 | Поменять SQL-схему | `engine/database.py` |
 | Изменить общие правила LLM | `main.py::ENGINE_SYSTEM` |
 | Изменить лор мира | `data/worlds/<name>/world.json` |
