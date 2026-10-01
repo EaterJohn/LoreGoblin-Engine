@@ -46,19 +46,19 @@ def test_allow_to_is_reusable_capability(world):
 def test_contextual_trade_tools(world):
     api = ActionAPI(world)
     world_names = {t['function']['name'] for t in api.tools('tavern_red_flask')}
-    assert 'start_trade' in world_names
-    assert 'buy_item' not in world_names
-    result = api.call('start_trade', {})
+    assert 'trade' in world_names
+    assert 'buy' not in world_names
+    result = api.call('trade', {})
     assert result['ok']
     assert result['interaction'] == 'trade'
     trade_names = {t['function']['name'] for t in api.tools('tavern_red_flask')}
-    assert trade_names == {'get', 'buy', 'end'}
-    stock = api.call('get', {})
+    assert {'stock', 'buy', 'end'} <= trade_names
+    assert 'trade' not in trade_names
+    stock = api.call('stock', {})
     assert stock['ok']
     assert {i['name'] for i in stock['items']} == {'Кружка пива', 'Железный кинжал'}
     dagger_choice = next(
-        i for i, item in enumerate(stock['items'], 1)
-        if item['name'] == 'Железный кинжал'
+        i['choice'] for i in stock['items'] if i['name'] == 'Железный кинжал'
     )
     bought = api.call('buy', {'choice': dagger_choice})
     assert bought['ok']
@@ -75,11 +75,11 @@ def test_contextual_trade_tools(world):
 def test_tools_filtered_by_location(world):
     api = ActionAPI(world)
     names_at_tavern = {t['function']['name'] for t in api.tools('tavern_red_flask')}
-    assert 'start_trade' in names_at_tavern
+    assert 'trade' in names_at_tavern
     names_empty_location = {t['function']['name'] for t in api.tools('ashport')}
-    assert 'start_trade' not in names_empty_location
+    assert 'trade' not in names_empty_location
     names_default = {t['function']['name'] for t in api.tools()}
-    assert 'start_trade' in names_default
+    assert 'trade' in names_default
 
 
 def test_load_world_is_world_agnostic(station):
@@ -151,3 +151,19 @@ def test_unknown_stat_error_lists_valid_stats(world):
     r = world.upgrade_stat('player', 'SPEED')
     assert r['error'] == 'UNKNOWN_STAT'
     assert r['stats'] == ['STR', 'CON', 'DEX', 'PER', 'WIL', 'INT', 'CHA', 'Luck', 'Eth']
+
+
+def test_listings_have_a_defined_order(world):
+    """Правило 4 (детерминизм): порядок выдачи не зависит от порядка вставки.
+    Номера `choice` у игрока строятся из этих списков."""
+    stock_names = [i['name'] for i in world.get_seller_stock('boris')['items']]
+    assert stock_names == sorted(stock_names)
+
+    world.buy_item('player', 'iron_dagger', 'boris')
+    world.buy_item('player', 'beer_mug', 'boris')
+    inv_names = [i['name'] for i in world.inventory()['items']]
+    assert inv_names == sorted(inv_names)
+
+    here = world.get_location_contents('tavern_red_flask')
+    keys = [(e['type'], e['name'], e['id']) for e in here]
+    assert keys == sorted(keys)  # четыре «Стула» различаются только по id

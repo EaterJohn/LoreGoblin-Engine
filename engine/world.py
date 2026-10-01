@@ -256,7 +256,7 @@ class WorldEngine:
 
     def get_location_contents(self, location_id):
         rows = self.db.query(
-            'SELECT id,type,name FROM entities WHERE location_id=? ORDER BY type,name',
+            'SELECT id,type,name FROM entities WHERE location_id=? ORDER BY type,name,id',
             (location_id,),
         )
         return [dict(r) for r in rows]
@@ -274,7 +274,8 @@ class WorldEngine:
             owner_id = self.player_id()
         rows = self.db.query(
             '''SELECT i.item_id,i.quantity,e.name FROM inventory i
-               JOIN entities e ON e.id=i.item_id WHERE i.owner_id=?''',
+               JOIN entities e ON e.id=i.item_id WHERE i.owner_id=?
+               ORDER BY e.name, i.item_id''',
             (owner_id,),
         )
         money = self.db.query(
@@ -352,7 +353,8 @@ class WorldEngine:
         if not self.allow_to(seller_id, 'trade'):
             return {'ok': False, 'error': 'SELLER_NOT_AVAILABLE_FOR_TRADE'}
         rows = self.db.query(
-            "SELECT id,name,data_json FROM entities WHERE type='item' AND location_id=?",
+            "SELECT id,name,data_json FROM entities WHERE type='item' AND location_id=? "
+            'ORDER BY name, id',
             (seller['location_id'],),
         )
         items = []

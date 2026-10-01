@@ -54,21 +54,21 @@ def test_plain_answer_needs_no_tools(run):
 
 
 def test_tool_result_is_fed_back_to_the_model(run):
-    reply, messages = run(FakeLLM(call('get_world_state', {}), say('Полдень')))
+    reply, messages = run(FakeLLM(call('look', {}), say('Полдень')))
     assert reply == 'Полдень'
     tool_msg = next(m for m in messages if m['role'] == 'tool')
-    assert tool_msg['tool_name'] == 'get_world_state'
-    assert json.loads(tool_msg['content'])['world_time'] == 'Day 1 12:00'
+    assert tool_msg['tool_name'] == 'look'
+    assert json.loads(tool_msg['content'])['time'] == 'Day 1 12:00'
 
 
 def test_arguments_may_arrive_as_json_string(run, world):
-    run(FakeLLM(call('advance_time', '{"minutes": 30}'), say('ok')))
+    run(FakeLLM(call('wait', '{"minutes": 30}'), say('ok')))
     assert world.world_state()['world_time'] == 'Day 1 12:30'
 
 
 @pytest.mark.parametrize('arguments', ['{not json', ['x'], 42, None])
 def test_garbage_arguments_do_not_crash_the_loop(run, world, arguments):
-    reply, messages = run(FakeLLM(call('advance_time', arguments), say('ok')))
+    reply, messages = run(FakeLLM(call('wait', arguments), say('ok')))
     assert reply == 'ok'
     tool_msg = next(m for m in messages if m['role'] == 'tool')
     assert json.loads(tool_msg['content'])['ok'] is False
@@ -76,14 +76,15 @@ def test_garbage_arguments_do_not_crash_the_loop(run, world, arguments):
 
 
 def test_tool_surface_follows_engine_mode(run):
-    llm = FakeLLM(call('start_trade', {}), say('Борис кивает'))
+    llm = FakeLLM(call('trade', {}), say('Борис кивает'))
     run(llm)
-    assert 'start_trade' in llm.tool_names_seen[0]
-    assert llm.tool_names_seen[1] == {'get', 'buy', 'end'}
+    assert 'trade' in llm.tool_names_seen[0]
+    assert {'stock', 'buy', 'end'} <= llm.tool_names_seen[1]
+    assert 'trade' not in llm.tool_names_seen[1]
 
 
 def test_round_limit_stops_runaway_tool_calls(run):
-    llm = FakeLLM(call('get_world_state', {}))
+    llm = FakeLLM(call('look', {}))
     reply, _ = run(llm)
     assert 'лимит' in reply
     assert len(llm.tool_names_seen) == main.MAX_TOOL_ROUNDS
@@ -125,3 +126,22 @@ def test_read_command_returns_none_on_eof(monkeypatch):
 
     monkeypatch.setattr('builtins.input', eof)
     assert main.read_command() is None
+
+
+OLD_TOOL_NAMES = (
+    'get_world_state', 'get_location_contents', 'get_entity', 'search_entities',
+    'get_inventory', 'upgrade_stat', 'advance_time', 'start_trade', 'seller_id',
+)
+
+
+def test_engine_prompt_does_not_mention_removed_tools():
+    for old in OLD_TOOL_NAMES:
+        assert old not in main.ENGINE_SYSTEM, old
+
+
+def test_engine_prompt_mentions_the_trade_vocabulary(world):
+    """Промпт и реестр тулов не должны расходиться."""
+    registry = {t.name for t in ActionAPI(world).registry}
+    for name in ('trade', 'stock', 'buy', 'end', 'inventory'):
+        assert name in registry
+        assert name in main.ENGINE_SYSTEM, name
