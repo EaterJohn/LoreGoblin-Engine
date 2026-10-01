@@ -1,3 +1,12 @@
+---
+type: idea
+status: idea
+last_reviewed: 2026-10-01
+priority: high-medium
+related: [ENG-001, ENG-003, ENG-017, ENG-020]
+read_when: трогаешь события, память, знания NPC, слухи, валидацию нарратива
+---
+
 # EVENTS_AND_KNOWLEDGE_IDEA.md — события, проекции, знания NPC, валидация нарратива
 
 - Дата: 2026-09-30

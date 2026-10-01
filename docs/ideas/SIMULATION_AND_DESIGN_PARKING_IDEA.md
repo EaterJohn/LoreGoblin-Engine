@@ -1,3 +1,12 @@
+---
+type: idea
+status: idea
+last_reviewed: 2026-10-01
+priority: low
+related: []
+read_when: нужны толпы, бой, прогрессия, маска игрока, производные параметры
+---
+
 # SIMULATION_AND_DESIGN_PARKING_IDEA.md — парковка: толпы, бой, прогрессия, маска, производные параметры
 
 - Дата: 2026-09-30

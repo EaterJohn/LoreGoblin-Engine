@@ -1,3 +1,12 @@
+---
+type: idea
+status: idea
+last_reviewed: 2026-10-01
+priority: low
+related: []
+read_when: проектируешь драйверы, черты, решения NPC, историю, слухи, месть
+---
+
 # NPC Mechanics — Drivers, Traits & Weighted Decisions
 
 **Status:** IDEA / DESIGN PARKING  

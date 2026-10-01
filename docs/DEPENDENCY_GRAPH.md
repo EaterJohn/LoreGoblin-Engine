@@ -1,4 +1,15 @@
+---
+type: spec
+status: accepted
+last_reviewed: 2026-10-01
+related: [ENG-011, MODDING]
+read_when: нужна диаграмма зависимостей модов или пишешь генератор (реализации нет)
+---
+
 # DEPENDENCY_GRAPH.md — диаграммы зависимостей модов
+
+Не путать с `vision/MODULES_AND_LAYERS.md`: здесь зависимости **модов** (диаграмма
+по `manifest.json`), там слои и категории модулей.
 
 Статус на 28.09.2026: спроектировано вместе с `manifest.json` /
 `installed_mods.lock.json` (`docs/MODDING.md`, решение `DECISIONS.md`

@@ -1,3 +1,12 @@
+---
+type: idea
+status: idea
+last_reviewed: 2026-10-01
+priority: medium-high
+related: [ENG-013, ENG-014, ENG-019]
+read_when: думаешь про аффордансы, значимость, прерывания, архетипы, факты локаций
+---
+
 # AFFORDANCES_AND_PERSISTENCE_IDEA.md — аффордансы, значимость, роли LLM, архетипы, локации
 
 - Дата: 2026-09-30

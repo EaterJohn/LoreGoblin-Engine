@@ -1,22 +1,36 @@
+---
+type: map
+status: living
+last_reviewed: 2026-10-01
+related: [STATUS, README]
+read_when: нужна карта файлов репозитория или «что где искать»; обновляй при любом добавлении, переносе, удалении файла
+---
+
 # PROJECT_STRUCTURE.md
 
 Живой документ — при добавлении/удалении/переносе файла обнови эту карту
 в той же сессии, где менялась структура.
 
-## Дерево на 29.09.2026
+## Дерево (сверка: см. `last_reviewed` в шапке)
 
 ```text
 LoreGoblin-Engine/
 ├── main.py                  # CLI, world selection, system prompt, messages, tool-loop
 ├── pyproject.toml           # метаданные, dev-зависимость pytest, настройки pytest
-├── README.md
+├── README.md                # справка: что это, запуск, карта документации
+├── AGENTS.md                # вход для ИИ-агентов: отсылка на docs/AI_CONTEXT.md
 ├── docs/
-│   ├── AI_CONTEXT.md
+│   ├── README.md            # навигация по документации, статусы, правила
+│   ├── AI_CONTEXT.md        # точка входа для ИИ
+│   ├── STATUS.md            # что реализовано, техдолг, открытые задачи
+│   ├── GLOSSARY.md          # термины и оси детализации
 │   ├── ARCHITECTURE.md
 │   ├── PROJECT_STRUCTURE.md
-│   ├── DECISIONS.md
+│   ├── DECISIONS.md         # реестр + журнал решений
 │   ├── MODDING.md
-│   └── DEPENDENCY_GRAPH.md
+│   ├── DEPENDENCY_GRAPH.md
+│   ├── ideas/               # идеи (не решения); IDEAS_INDEX.md, 6 файлов
+│   └── vision/              # долгосрочное видение; VISION_INDEX.md
 ├── data/
 │   ├── rules/
 │   │   └── presets/
@@ -60,10 +74,11 @@ LoreGoblin-Engine/
 | Понять загрузку стартового состояния | `engine/world.py::load_world()` |
 | Изменить параметры календаря | `data/rules/presets/<id>.json` |
 | Проверить архитектурные решения | `docs/DECISIONS.md` |
+| Узнать, что реализовано и что в долге | `docs/STATUS.md` |
+| Найти значение термина | `docs/GLOSSARY.md` |
+| Посмотреть идею или долгосрочное направление | `docs/ideas/IDEAS_INDEX.md`, `docs/vision/VISION_INDEX.md` |
 | Запустить тесты | `pip install -e ".[dev]"` и `pytest` |
 
-## Известные открытые задачи
+## Открытые задачи
 
-- `#ENG-003` — персистентность диалога и суммаризация истории.
-- `#ENG-011` — манифест/lock-файл модов и генератор диаграмм зависимостей.
-- Техдолг: `money.silver` всё ещё зашит в SQLite-схему.
+Перенесены в `STATUS.md` (единый источник).
